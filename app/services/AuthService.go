@@ -140,6 +140,17 @@ func (s *AuthenticationService) UpdateUser(ctx context.Context, req *auth.Update
 			return &response, nil
 		}
 
+		s.db.Where("id=?", req.Id).Find(&user)
+
+		err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.CurrentPassword))
+		if err != nil {
+			response := auth.UpdateUserRes{
+				Message: "Current Password is invalid",
+				Id:      0,
+			}
+			return &response, err
+		}
+
 		if pass == "" {
 			result = s.db.Model(&user).Where("id = ?", req.Id).Updates(map[string]interface{}{
 				"username":   req.Username,

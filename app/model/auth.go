@@ -8,10 +8,11 @@ type AuthInput struct {
 }
 
 type EditInput struct {
-	Id         int64  `json:"id"`
-	Username   string `json:"username"`
-	Password   string `json:"password"`
-	RePassword string `json:"repassword"`
+	Id              int64  `json:"id"`
+	Username        string `json:"username"`
+	CurrentPassword string `json:"current_password"`
+	Password        string `json:"password"`
+	RePassword      string `json:"repassword"`
 }
 
 type Claims struct {

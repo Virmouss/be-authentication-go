@@ -27,4 +27,8 @@ GIN_PORT=800
 /login  (requires "username", "password")\
 /logout (requires Bearer token)\
 /profile (requires Bearer token, "id")\
-/profile/edit (requires Bearer token, "id", "username", "password", "repassword")
+/profile/edit (requires Bearer token, "id", "username", optional "current_password", "password", "repassword")
+
+**Admin roles:**\
+/profile/reset-password (requires Bearer token, "id", "username")\
+/admin/users (requires Bearer token)

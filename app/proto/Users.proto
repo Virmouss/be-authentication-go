@@ -40,8 +40,9 @@ message LoginRes {
 message UpdateUserReq {
     int64 id = 1;
     string username = 2;
-    string password = 3;
-    string role = 4;
+    string current_password = 3;
+    string password = 4;
+    string role = 5;
 }
 
 message UpdateUserRes{

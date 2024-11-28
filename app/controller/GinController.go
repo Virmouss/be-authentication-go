@@ -252,10 +252,11 @@ func UpdateUserHTTP(ctx *gin.Context) {
 	request := auth.UpdateUserReq{}
 	if userInput.Password != "" {
 		request = auth.UpdateUserReq{
-			Id:       userInput.Id,
-			Username: userInput.Username,
-			Password: userInput.Password,
-			Role:     claims.Role,
+			Id:              userInput.Id,
+			Username:        userInput.Username,
+			CurrentPassword: userInput.CurrentPassword,
+			Password:        userInput.Password,
+			Role:            claims.Role,
 		}
 	} else {
 		request = auth.UpdateUserReq{
