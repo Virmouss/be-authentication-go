@@ -5,8 +5,9 @@ option go_package = "be-authentication/auth";
 message AddUserReq {
     string username = 1;
     string password = 2;
-    string updated_at = 3;
-    string created_at = 4;
+    string user = 3;
+    string updated_at = 4;
+    string created_at = 5;
 }
 
 message AddUserRes {
@@ -22,6 +23,7 @@ message GetUserByIdReq {
 message GetUserByIdRes {
     int64 id =1;
     string username = 2;
+    string role = 3;
 }
 
 message LoginReq {
@@ -31,11 +33,42 @@ message LoginReq {
 
 message LoginRes {
     string message = 1;
-    int64 id = 2; 
+    string role = 2;
+    int64 id = 3; 
+}
+
+message UpdateUserReq {
+    int64 id = 1;
+    string username = 2;
+    string password = 3;
+    string role = 4;
+}
+
+message UpdateUserRes{
+    string message = 1;
+    int64 id = 2;
+}
+
+message GetUserListRes{
+    message User{
+        int64 id =1;
+        string username =2;
+        string role =3;
+        string updated_at=4;
+        string created_at=5;
+    }
+    repeated User userList = 1;
+    int32 total_data =2;
+}
+
+message GetUserListReq{
+    string role = 1;
 }
 
 service Authentication {
     rpc addUser(AddUserReq) returns (AddUserRes);
     rpc GetUserById(GetUserByIdReq) returns (GetUserByIdRes);
+    rpc UpdateUser(UpdateUserReq) returns (UpdateUserRes);
+    rpc GetUserList(GetUserListReq) returns (GetUserListRes);
     rpc Login(LoginReq) returns (LoginRes);
 }

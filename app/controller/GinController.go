@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -47,7 +48,7 @@ func LoginHTTP(ctx *gin.Context) {
 
 	if err != nil {
 		log.Print(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create gRPC Client"})
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create gRPC Client or Something Went Wrong"})
 		return
 	}
 
@@ -56,7 +57,7 @@ func LoginHTTP(ctx *gin.Context) {
 		return
 	}
 
-	token, err := GenerateJWT(response.Id)
+	token, err := GenerateJWT(response.Id, response.Role)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "failed to generate token"})
 	}
@@ -100,12 +101,21 @@ func LogoutHTTP(ctx *gin.Context) {
 
 func AddUserHttp(ctx *gin.Context) {
 
-	var userInput model.User
+	var userInput model.EditInput
 
 	err := ctx.ShouldBindJSON(&userInput)
 
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if !ValidatePassword(userInput.Password) {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Password must be Alphanumeric and symbols with minimum length 8 characters and maximum length 32 characters"})
+		return
+	}
+	if userInput.Password != userInput.RePassword {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Password is not the same"})
 		return
 	}
 
@@ -124,7 +134,7 @@ func AddUserHttp(ctx *gin.Context) {
 	response, err := client.AddUser(context.Background(), request)
 
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create gRPC Client"})
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create gRPC Client or Something Went Wrong"})
 		return
 	}
 
@@ -177,7 +187,7 @@ func GetUserByIdHTTP(ctx *gin.Context) {
 
 	response, err := client.GetUserById(ctx_grpc, &request)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create gRPC Client"})
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create gRPC Client or Something Went Wrong"})
 		return
 	}
 
@@ -190,6 +200,231 @@ func GetUserByIdHTTP(ctx *gin.Context) {
 		"Id":       response.Id,
 		"Username": response.Username,
 	})
+
+}
+
+func UpdateUserHTTP(ctx *gin.Context) {
+	var userInput model.EditInput
+
+	err := ctx.ShouldBindJSON(&userInput)
+
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if userInput.Password != "" {
+		if !ValidatePassword(userInput.Password) {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Password must be Alphanumeric and symbols with minimum length 8 characters and maximum length 32 characters"})
+			return
+		}
+		if userInput.Password != userInput.RePassword {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Password is not the same"})
+			return
+		}
+	}
+
+	token_string := ctx.GetHeader("Authorization")
+
+	authToken := strings.Split(token_string, " ")
+	if len(authToken) != 2 || authToken[0] != "Bearer" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token format"})
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	tokenStr := authToken[1]
+
+	// Parse and get claims from token
+	claims := &model.Claims{}
+	_, err = jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("API_KEY")), nil
+	})
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		return
+	}
+
+	md := metadata.New(map[string]string{
+		"auth": authToken[1],
+	})
+
+	request := auth.UpdateUserReq{}
+	if userInput.Password != "" {
+		request = auth.UpdateUserReq{
+			Id:       userInput.Id,
+			Username: userInput.Username,
+			Password: userInput.Password,
+			Role:     claims.Role,
+		}
+	} else {
+		request = auth.UpdateUserReq{
+			Id:       userInput.Id,
+			Username: userInput.Username,
+			Password: "",
+			Role:     claims.Role,
+		}
+	}
+
+	ctx_grpc := metadata.NewOutgoingContext(context.Background(), md)
+
+	client, connnection, err := createGRPCClient()
+	if err != nil {
+		log.Print(err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to connect to gRPC service"})
+		return
+	}
+	defer connnection.Close()
+
+	response, err := client.UpdateUser(ctx_grpc, &request)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create gRPC Client or Something Went Wrong"})
+		return
+	}
+
+	if response.Message != "Data Saved Successfully" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": response.Message})
+		return
+	}
+
+	ctx.JSON(200, gin.H{"status": "User Updated"})
+
+}
+
+func GetUserListHTTP(ctx *gin.Context) {
+	token_string := ctx.GetHeader("Authorization")
+
+	authToken := strings.Split(token_string, " ")
+	if len(authToken) != 2 || authToken[0] != "Bearer" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token format"})
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	tokenStr := authToken[1]
+
+	// Parse and get claims from token (optional)
+	claims := &model.Claims{}
+	_, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("API_KEY")), nil
+	})
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		return
+	}
+	if claims.Role != "Super Admin" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized Access"})
+		return
+	}
+	md := metadata.New(map[string]string{
+		"auth": authToken[1],
+	})
+
+	ctx_grpc := metadata.NewOutgoingContext(context.Background(), md)
+
+	request := auth.GetUserListReq{Role: claims.Role}
+
+	client, connnection, err := createGRPCClient()
+	if err != nil {
+		log.Print(err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to connect to gRPC service"})
+		return
+	}
+	defer connnection.Close()
+
+	response, err := client.GetUserList(ctx_grpc, &request)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create gRPC Client or Something Went Wrong"})
+		return
+	}
+
+	if response.TotalData == 0 {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "No User Found"})
+		return
+	}
+
+	userList := []gin.H{}
+	for _, user := range response.UserList {
+		userList = append(userList, gin.H{
+			"id":         user.Id,
+			"username":   user.Username,
+			"role":       user.Role,
+			"updated_at": user.UpdatedAt,
+			"created_at": user.CreatedAt,
+		})
+	}
+	ctx.JSON(200, gin.H{
+		"user_list":  userList,
+		"total_data": response.TotalData,
+	})
+}
+
+func ResetUserPassword(ctx *gin.Context) {
+
+	token_string := ctx.GetHeader("Authorization")
+
+	authToken := strings.Split(token_string, " ")
+	if len(authToken) != 2 || authToken[0] != "Bearer" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token format"})
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	tokenStr := authToken[1]
+
+	// Parse and get claims from token (optional)
+	claims := &model.Claims{}
+	_, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("API_KEY")), nil
+	})
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		return
+	}
+	if claims.Role != "Super Admin" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized Access"})
+	}
+	md := metadata.New(map[string]string{
+		"auth": authToken[1],
+	})
+
+	var userInput model.EditInput
+	err = ctx.ShouldBindJSON(&userInput)
+
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	request := auth.UpdateUserReq{
+		Id:       userInput.Id,
+		Username: userInput.Username,
+		Password: "123456",
+		Role:     claims.Role,
+	}
+
+	ctx_grpc := metadata.NewOutgoingContext(context.Background(), md)
+
+	client, connnection, err := createGRPCClient()
+	if err != nil {
+		log.Print(err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to connect to gRPC service"})
+		return
+	}
+	defer connnection.Close()
+
+	response, err := client.UpdateUser(ctx_grpc, &request)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create gRPC Client or Something Went Wrong"})
+		return
+	}
+
+	if response.Message != "Data Saved Successfully" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": response.Message})
+		return
+	}
+
+	ctx.JSON(200, gin.H{"status": "User Password Resetted"})
 
 }
 
@@ -207,9 +442,10 @@ func createGRPCClient() (auth.AuthenticationClient, *grpc.ClientConn, error) {
 
 }
 
-func GenerateJWT(id int64) (string, error) {
+func GenerateJWT(id int64, role string) (string, error) {
 	claims := &model.Claims{
-		Id: id,
+		Id:   id,
+		Role: role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 1)),
 		},
@@ -223,4 +459,11 @@ func GenerateJWT(id int64) (string, error) {
 	//log.Println("Generated JWT Token:", signedToken)
 	return signedToken, nil
 	//return token.SignedString([]byte(os.Getenv("API_KEY")))
+}
+
+func ValidatePassword(password string) bool {
+	passwordRegex := `^[a-zA-Z0-9!@#$%^&*(),.?":{}|<>_\-+=~` + "`" + `\[\]\\\/;']{8,32}$`
+
+	re := regexp.MustCompile(passwordRegex)
+	return re.MatchString(password)
 }

@@ -23,7 +23,8 @@ GIN_PORT=800
 ```
 
 # Endpoints
-/signup (requires "username", "password")
-/login  (requires "username", "password")
-/logout (requires Bearer token)
-/profile (requires Bearer token, "id")
+/signup (requires "username", "password", "repassword")\
+/login  (requires "username", "password")\
+/logout (requires Bearer token)\
+/profile (requires Bearer token, "id")\
+/profile/edit (requires Bearer token, "id", "username", "password", "repassword")

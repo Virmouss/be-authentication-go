@@ -71,6 +71,12 @@ func StartGinServer() {
 
 	protected.Use(middleware.AuthMiddleware)
 	protected.GET("", controller.GetUserByIdHTTP)
+	protected.PATCH("/edit", controller.UpdateUserHTTP)
+	protected.PATCH("/reset-password", controller.ResetUserPassword)
+
+	protectedAdmin := server.Group("/admin")
+	protectedAdmin.Use(middleware.AuthMiddleware)
+	protectedAdmin.GET("/users", controller.GetUserListHTTP)
 
 	server.Run(hostName + ":" + portNumber)
 }

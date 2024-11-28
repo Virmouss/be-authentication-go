@@ -7,7 +7,15 @@ type AuthInput struct {
 	Password string `json:"password" binding:"required"`
 }
 
+type EditInput struct {
+	Id         int64  `json:"id"`
+	Username   string `json:"username"`
+	Password   string `json:"password"`
+	RePassword string `json:"repassword"`
+}
+
 type Claims struct {
-	Id int64 `json:"id"`
+	Id   int64  `json:"id"`
+	Role string `json:"role"`
 	jwt.RegisteredClaims
 }

@@ -67,9 +67,66 @@ func (h *AuthenticationController) GetUserById(ctx context.Context, req *auth.Ge
 	if err != nil {
 		return nil, status.Errorf((codes.Unauthenticated), "invalid token: %v", err)
 	}
-	log.Printf("Fetching User Data for Id: %v", claims.ID)
+	log.Printf("Fetching User Data for Id: %v", claims.Id)
 
 	service_response, err := h.authService.GetUserById(ctx, req)
+
+	if err != nil {
+		return service_response, err
+	}
+
+	return service_response, nil
+}
+
+func (h *AuthenticationController) UpdateUser(ctx context.Context, req *auth.UpdateUserReq) (*auth.UpdateUserRes, error) {
+
+	md, ok := metadata.FromIncomingContext(ctx)
+
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "missing metada")
+	}
+
+	authHeader := md["auth"]
+	if len(authHeader) == 0 {
+		return nil, status.Error(codes.Unauthenticated, "missing auth token")
+	}
+	//log.Printf("Md Auth:%v", authHeader[0])
+	claims, err := middleware.VerifyJWT(authHeader[0])
+
+	if err != nil {
+		return nil, status.Errorf((codes.Unauthenticated), "invalid token: %v", err)
+	}
+	//log.Printf("Updating User Data for Id: %v", claims.Id)
+
+	service_response, err := h.authService.UpdateUser(ctx, req, claims.Id)
+
+	if err != nil {
+		return service_response, nil
+	}
+
+	return service_response, nil
+}
+
+func (h *AuthenticationController) GetUserList(ctx context.Context, req *auth.GetUserListReq) (*auth.GetUserListRes, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "missing metada")
+	}
+
+	authHeader := md["auth"]
+	if len(authHeader) == 0 {
+		return nil, status.Error(codes.Unauthenticated, "missing auth token")
+	}
+	//log.Printf("Md Auth:%v", authHeader[0])
+	claims, err := middleware.VerifyJWT(authHeader[0])
+
+	if err != nil {
+		return nil, status.Errorf((codes.Unauthenticated), "invalid token: %v", err)
+	}
+	log.Printf("Fetching Data List for: %v", claims.Role)
+
+	service_response, err := h.authService.GetUserList(ctx, req)
 
 	if err != nil {
 		return service_response, err

@@ -16,11 +16,12 @@ func Seed(db *gorm.DB) {
 	db.Model([]model.User{}).Count(&count)
 
 	if count == 0 {
-		CreateUserModel(db, "admin", "admin123")
+		CreateUserModel(db, "admin", "admin123", "Super Admin")
+		CreateUserModel(db, "user", "user123", "User")
 	}
 }
 
-func CreateUserModel(db *gorm.DB, username string, password string) {
+func CreateUserModel(db *gorm.DB, username string, password string, role string) {
 
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -29,8 +30,9 @@ func CreateUserModel(db *gorm.DB, username string, password string) {
 
 	data := []model.User{
 		{
-			Username:  "admin",
+			Username:  username,
 			Password:  string(passwordHash),
+			Role:      role,
 			CreatedAt: time.Now().String(),
 			UpdatedAt: time.Now().String(),
 		},
