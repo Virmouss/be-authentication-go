@@ -213,6 +213,11 @@ func UpdateUserHTTP(ctx *gin.Context) {
 		return
 	}
 
+	if userInput.CurrentPassword != "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Current password must be included"})
+		return
+	}
+
 	if userInput.Password != "" {
 		if !ValidatePassword(userInput.Password) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Password must be Alphanumeric and symbols with minimum length 8 characters and maximum length 32 characters"})
